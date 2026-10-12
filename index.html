@@ -31,7 +31,7 @@ canvas{display:block}
 #rm{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;z-index:2000}
 .box{background:#1a1a1a;border:2px solid #fc0;border-radius:16px;padding:25px;text-align:center;min-width:260px;box-shadow:0 0 40px rgba(255,200,0,.5)}
 .box .t{color:#fc0;font-size:18px;margin-bottom:15px}
-#rc{color:#fff;background:#000;padding:15px;border-radius:10px;font:22px monospace;letter-spacing:2px;margin-bottom:18px;border:1px dashed #fc0;user-select:all;word-break:break-all}
+#rc{color:#fff;background:#000;padding:15px;border-radius:10px;font:20px monospace;letter-spacing:1px;margin-bottom:18px;border:1px dashed #fc0;user-select:all;word-break:break-all}
 .btns{display:flex;gap:12px;justify-content:center}
 .btns button{padding:10px 22px;border-radius:25px;border:2px solid #fff;font:bold 15px inherit;cursor:pointer;color:#fff}
 #cb{background:#4CAF50}#ob{background:#f55}
@@ -84,7 +84,13 @@ function col(x,z,r){for(const w of walls)if(Math.abs(x-w.x)<w.hw+r&&Math.abs(z-w
 const bg=new THREE.SphereGeometry(.2,8,8),bm=new THREE.MeshBasicMaterial({color:0xffee44});
 const mg=new THREE.BoxGeometry(1.2,1.2,1.2),mm2=new THREE.MeshStandardMaterial({color:0xcc2222});
 
-let ms=[],bs=[],tt=0,st=0,sht=0,go=0,pa=0,fl=0,spent=0;
+// ====== العملة: الجانب بنفسجي + الوجهان نفس الصورة بدون انعكاس ======
+const coinURL='https://i.postimg.cc/cHM21qYD/IMG-20261008-153917-222.jpg';
+const coinTex=new THREE.TextureLoader().load(coinURL);
+const cSide=new THREE.MeshStandardMaterial({color:0x8833cc,metalness:.85,roughness:.3,emissive:0x331155});
+const cFace=new THREE.MeshStandardMaterial({map:coinTex,metalness:.5,roughness:.4,emissive:0x443300,emissiveIntensity:.3});
+
+let ms=[],bs=[],cs=[],tt=0,st=0,sht=0,go=0,pa=0,fl=0,spent=0,bonus=0,crt=0;
 const PR=.4,GR=25,JV=10,SH=.7,FH=8;
 const P={x:4,z:4,y:0,vy:0,og:1,yaw:0,pitch:0,speed:8,boost:0};
 const J={x:0,y:0},keys={};
@@ -93,15 +99,26 @@ function loadS(){try{return JSON.parse(localStorage.getItem('mgs')||'[]')}catch(
 function saveS(t){const s=loadS();s.push(t);s.sort((a,b)=>b-a);localStorage.setItem('mgs',JSON.stringify(s.slice(0,5)))}
 function rB(){const s=loadS();document.getElementById('bl').innerHTML=s.length===0?'<div style="opacity:.5;text-align:center">لا يوجد</div>':s.map((v,i)=>`<div>${i+1}. <span>${v}</span> ث</div>`).join('')}
 
-const CODES={10:['6767676'],5:['HAHAHAH','PPPPPPP','MOH6767','HES0YAM'],.5:['VONJFTG','BHYGFD','OKATVCD','IMJYCXZ','MOKHSNB','OJKLUGZ','ZUPKMH','WANRNEW','GDHHJJKG','HHHHHHH','HIFOWVW','YFOWQMJ','GDHTXHA','AWQMOPA','HMFYBDK','VODMHAA','YFHOLHJ','TDOEMFH']};
+// ====== مولّد الأكواد: الرقم = النقاط المتوفرة + 5 ======
+const LT='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const CN=['龙','虎','凤','神','武','道','天','地','玄','黄','宇','宙','洪','荒','日','月'];
+const rl=()=>LT[Math.floor(Math.random()*26)];
+const rcn=()=>CN[Math.floor(Math.random()*CN.length)];
+function mkCode(){
+  const v=av()+5;
+  const s=Number.isInteger(v)?v:v.toFixed(1);
+  if(Math.random()<.5)return rl()+'?#'+rl()+'=('+s+')!'+rcn();
+  return rl()+rl()+'=('+s+')?$#'+rcn();
+}
+
 const pv=document.getElementById('pv'),rb=document.getElementById('rb'),rm=document.getElementById('rm'),rc=document.getElementById('rc');
-const av=()=>Math.max(0,Math.floor(tt/50)*.5-spent);
+const av=()=>Math.max(0,Math.floor(tt/50)*.5+bonus-spent);
 const tier=()=>{const a=av();return a>=10?10:a>=5?5:a>=.5?.5:null};
 const fmt=p=>p===0?'0':Number.isInteger(p)?p:p.toFixed(1);
 function rP(){const a=av();pv.textContent=fmt(a);rb.style.display=a>=.5?'block':'none'}
 
-rb.onclick=function(){if(pa||go)return;const t=tier();if(t===null)return;
-const L=CODES[t];rc.textContent=L[Math.floor(Math.random()*L.length)];
+rb.onclick=function(){if(pa||go)return;if(tier()===null)return;
+rc.textContent=mkCode();
 document.getElementById('cb').textContent='نسخ';
 rm.style.display='flex';pa=1;po.style.display='none';rJ()};
 
@@ -157,22 +174,55 @@ addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousedown',e=>{if(e.button===2&&!go&&!pa){P.boost=!P.boost;bb.classList.toggle('a',P.boost)}});
 
 const mc=document.getElementById('mm').getContext('2d'),WD=COLS*CL,SC=50/WD,HF=WD/2;
-function dm(){mc.clearRect(0,0,50,50);mc.fillStyle='#f33';
+function dm(){mc.clearRect(0,0,50,50);
+mc.fillStyle='#fc0';
+for(const c of cs)mc.fillRect((c.m.position.x+HF)*SC-1,(c.m.position.z+HF)*SC-1,2,2);
+mc.fillStyle='#f33';
 for(const m of ms)mc.fillRect((m.m.position.x+HF)*SC-1,(m.m.position.z+HF)*SC-1,2,2);
 mc.fillStyle='#4f4';mc.fillRect((P.x+HF)*SC-2,(P.z+HF)*SC-2,4,4)}
 
-function init(){if(ms)ms.forEach(m=>S.remove(m.m));if(bs)bs.forEach(b=>S.remove(b.m));
-ms=[];bs=[];tt=0;st=0;sht=0;go=0;pa=0;fl=0;spent=0;
+function init(){if(ms)ms.forEach(m=>S.remove(m.m));if(bs)bs.forEach(b=>S.remove(b.m));if(cs)cs.forEach(c=>S.remove(c.m));
+ms=[];bs=[];cs=[];tt=0;st=0;sht=0;go=0;pa=0;fl=0;spent=0;bonus=0;crt=0;
 hud.classList.remove('p');po.style.display='none';rm.style.display='none';bd.classList.remove('f');
 Object.assign(P,{x:4,z:4,y:0,vy:0,og:1,yaw:0,pitch:0,boost:0});bb.classList.remove('a');
 rJ();lkT=null;document.getElementById('time').textContent='0';document.getElementById('go').style.display='none';
-for(let i=0;i<3;i++)sM();rB();rP()}
+for(let i=0;i<3;i++)sM();
+for(let i=0;i<2;i++)sC();
+rB();rP()}
 document.getElementById('rs').onclick=init;
 
 function sM(){let x,z,t=0;do{x=(Math.floor(Math.random()*COLS)-COLS/2+.5)*CL;
 z=(Math.floor(Math.random()*ROWS)-ROWS/2+.5)*CL;t++}while(Math.hypot(x-P.x,z-P.z)<15&&t<50);
 const m=new THREE.Mesh(mg,mm2.clone());m.position.set(x,.6,z);S.add(m);
 ms.push({m,speed:2.5+Math.random()*1.2})}
+
+function sC(){
+  let x,z,t=0;
+  do{x=(Math.floor(Math.random()*COLS)-COLS/2+.5)*CL;
+     z=(Math.floor(Math.random()*ROWS)-ROWS/2+.5)*CL;t++}
+  while(Math.hypot(x-P.x,z-P.z)<6&&t<50);
+
+  const Rr=0.7,H=0.14;
+  const grp=new THREE.Group();
+
+  // الجانب (بنفسجي)
+  const side=new THREE.Mesh(new THREE.CylinderGeometry(Rr,Rr,H,24,1,true),cSide);
+  side.rotation.z=Math.PI/2;
+  grp.add(side);
+
+  // الوجهان - كل واحد بصورة مستقلة عشان ما يصير انعكاس
+  const fGeo=new THREE.CircleGeometry(Rr,24);
+  const f1=new THREE.Mesh(fGeo,cFace);
+  f1.position.x=H/2; f1.rotation.y=Math.PI/2;
+  grp.add(f1);
+  const f2=new THREE.Mesh(fGeo,cFace);
+  f2.position.x=-H/2; f2.rotation.y=-Math.PI/2;
+  grp.add(f2);
+
+  grp.position.set(x,.9,z);
+  S.add(grp);
+  cs.push({m:grp});
+}
 
 function shoot(){const dx=Math.sin(P.yaw),dz=Math.cos(P.yaw);
 const m=new THREE.Mesh(bg,bm);m.position.set(P.x+dx*.8,P.y+1.3,P.z+dz*.8);S.add(m);
@@ -202,6 +252,12 @@ for(let i=bs.length-1;i>=0;i--){const b=bs[i];b.m.position.x+=b.vx*dt;b.m.positi
 let rm=0;for(let j=ms.length-1;j>=0;j--){const m=ms[j];
 if(Math.hypot(b.m.position.x-m.m.position.x,b.m.position.z-m.m.position.z)<1){S.remove(m.m);ms.splice(j,1);S.remove(b.m);bs.splice(i,1);rm=1;break}}
 if(!rm&&b.life<=0){S.remove(b.m);bs.splice(i,1)}}
+// العملات
+for(let i=cs.length-1;i>=0;i--){const c=cs[i];c.m.rotation.y+=dt*3;
+c.m.position.y=.9+Math.sin(tt*3)*.15;
+if(Math.hypot(c.m.position.x-P.x,c.m.position.z-P.z)<1.2){
+S.remove(c.m);cs.splice(i,1);bonus+=.5;rP();crt=4}}
+crt-=dt;if(cs.length<2&&crt<=0){sC();crt=4}
 st-=dt;if(st<=0){sM();st=Math.max(.5,1.8-tt*.015)}}
 
 function endG(){go=1;pa=0;fl=0;hud.classList.remove('p');po.style.display='none';rm.style.display='none';bd.classList.remove('f');
