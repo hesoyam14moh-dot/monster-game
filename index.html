@@ -59,9 +59,25 @@ const C=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,300);
 const R=new THREE.WebGLRenderer({antialias:true});R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(R.domElement);
 S.add(new THREE.HemisphereLight(0xffffff,0x445566,1.2));
 const sun=new THREE.DirectionalLight(0xffffff,.7);sun.position.set(10,20,10);S.add(sun);
-const gd=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({color:0x44aa44}));
+
+// ====== الأرضية ======
+const groundTex=new THREE.TextureLoader().load('https://i.postimg.cc/0NJTvBBJ/file-00000000e22881f5a50dbc1bf84a6178.png');
+groundTex.wrapS=THREE.RepeatWrapping;
+groundTex.wrapT=THREE.RepeatWrapping;
+groundTex.repeat.set(20,20);
+const gd=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({map:groundTex,color:0xffffff}));
 gd.rotation.x=-Math.PI/2;S.add(gd);
 
+// ====== صورة الوحش ======
+const monsterTex=new THREE.TextureLoader().load('https://i.postimg.cc/VsTHfRXT/images-(10).jpg');
+const monsterMat=new THREE.MeshStandardMaterial({
+  map:monsterTex,
+  color:0x555555,
+  roughness:0.85,
+  metalness:0.05
+});
+
+// ====== المتاهة: الجدران عادت للارتفاع 3 + صورة جديدة ======
 const COLS=8,ROWS=8,CL=8,WH=3,WT=.6;
 const cells=[];
 for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)cells.push({x,y,t:1,r:1,b:1,l:1,v:0});
@@ -71,7 +87,12 @@ const ds=[{dx:0,dy:-1,w:'t',o:'b'},{dx:1,dy:0,w:'r',o:'l'},{dx:0,dy:1,w:'b',o:'t
 for(const d of ds){const n=gc(cx+d.dx,cy+d.dy);if(n&&!n.v){c[d.w]=0;n[d.o]=0;carve(cx+d.dx,cy+d.dy)}}}
 carve(0,0);
 
-const wm=new THREE.MeshStandardMaterial({color:0x8899aa});
+// ====== صورة الجدران ======
+const wallTex=new THREE.TextureLoader().load('https://i.postimg.cc/pr4F8yPC/images-(11).jpg');
+wallTex.wrapS=THREE.RepeatWrapping;
+wallTex.wrapT=THREE.RepeatWrapping;
+wallTex.repeat.set(1,1);
+const wm=new THREE.MeshStandardMaterial({map:wallTex,color:0xffffff});
 const walls=[];
 function addW(x,z,l,h){const w=h?l:WT,d=h?WT:l;
 const m=new THREE.Mesh(new THREE.BoxGeometry(w,WH,d),wm);m.position.set(x,WH/2,z);S.add(m);
@@ -82,16 +103,19 @@ if(c.y===ROWS-1&&c.b)addW(cx,cz+CL/2,CL+WT,1);if(c.x===COLS-1&&c.r)addW(cx+CL/2,
 function col(x,z,r){for(const w of walls)if(Math.abs(x-w.x)<w.hw+r&&Math.abs(z-w.z)<w.hd+r)return 1;return 0}
 
 const bg=new THREE.SphereGeometry(.2,8,8),bm=new THREE.MeshBasicMaterial({color:0xffee44});
-const mg=new THREE.BoxGeometry(1.2,1.2,1.2),mm2=new THREE.MeshStandardMaterial({color:0xcc2222});
 
-// ====== العملة: الجانب بنفسجي + الوجهان نفس الصورة بدون انعكاس ======
+// ====== الوحش: أكبر شوي (2.5) مع إمكانية النط فوقه ======
+const mg=new THREE.BoxGeometry(2.5,2.5,2.5);
+
 const coinURL='https://i.postimg.cc/cHM21qYD/IMG-20261008-153917-222.jpg';
 const coinTex=new THREE.TextureLoader().load(coinURL);
 const cSide=new THREE.MeshStandardMaterial({color:0x8833cc,metalness:.85,roughness:.3,emissive:0x331155});
 const cFace=new THREE.MeshStandardMaterial({map:coinTex,metalness:.5,roughness:.4,emissive:0x443300,emissiveIntensity:.3});
 
 let ms=[],bs=[],cs=[],tt=0,st=0,sht=0,go=0,pa=0,fl=0,spent=0,bonus=0,crt=0;
-const PR=.4,GR=25,JV=10,SH=.7,FH=8;
+let seqBoost=0,seqJump=0;
+// رفعنا قوة النطة عشان نقدر ننط فوق الوحش (2.5 ارتفاع)
+const PR=.4,GR=25,JV=13,SH=.7,FH=8;
 const P={x:4,z:4,y:0,vy:0,og:1,yaw:0,pitch:0,speed:8,boost:0};
 const J={x:0,y:0},keys={};
 
@@ -99,7 +123,6 @@ function loadS(){try{return JSON.parse(localStorage.getItem('mgs')||'[]')}catch(
 function saveS(t){const s=loadS();s.push(t);s.sort((a,b)=>b-a);localStorage.setItem('mgs',JSON.stringify(s.slice(0,5)))}
 function rB(){const s=loadS();document.getElementById('bl').innerHTML=s.length===0?'<div style="opacity:.5;text-align:center">لا يوجد</div>':s.map((v,i)=>`<div>${i+1}. <span>${v}</span> ث</div>`).join('')}
 
-// ====== مولّد الأكواد: الرقم = النقاط المتوفرة + 5 ======
 const LT='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const CN=['龙','虎','凤','神','武','道','天','地','玄','黄','宇','宙','洪','荒','日','月'];
 const rl=()=>LT[Math.floor(Math.random()*26)];
@@ -136,10 +159,18 @@ if(pa){rJ();P.boost=0;bb.classList.remove('a')}}
 hud.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();tP()},{passive:false});
 hud.addEventListener('click',e=>{e.preventDefault();tP()});
 
-const bd=document.getElementById('bd');let lt=0;
-function bT(e){e.preventDefault();e.stopPropagation();if(go||pa)return;
-const n=Date.now();if(n-lt<400){fl=!fl;bd.classList.toggle('f',fl);lt=0}else lt=n}
-bd.addEventListener('touchstart',bT,{passive:false});bd.addEventListener('click',bT);
+const bd=document.getElementById('bd');
+function bT(e){
+  e.preventDefault();e.stopPropagation();
+  if(go||pa)return;
+  if(seqBoost&&seqJump){
+    fl=!fl;
+    bd.classList.toggle('f',fl);
+  }
+  seqBoost=0;seqJump=0;
+}
+bd.addEventListener('touchstart',bT,{passive:false});
+bd.addEventListener('click',bT);
 
 const js=document.getElementById('js'),kn=document.getElementById('kn'),JM=50;
 let jt=null;const jc={x:0,y:0};
@@ -164,14 +195,27 @@ function lE(e){for(const t of e.changedTouches)if(t.identifier===lkT)lkT=null}
 R.domElement.addEventListener('touchend',lE);R.domElement.addEventListener('touchcancel',lE);
 
 const jb=document.getElementById('jb'),bb=document.getElementById('bb');
-function doJ(){if(go||pa)return;if(fl){P.vy=8;P.og=0}else if(P.og){P.vy=JV;P.og=0}}
+function doJ(){
+  if(go||pa)return;
+  if(fl){P.vy=8;P.og=0;}
+  else if(P.og){P.vy=JV;P.og=0;}
+  if(P.boost) seqJump=1;
+}
 jb.addEventListener('touchstart',e=>{e.preventDefault();doJ()},{passive:false});
-bb.addEventListener('touchstart',e=>{e.preventDefault();if(go||pa)return;P.boost=!P.boost;bb.classList.toggle('a',P.boost)},{passive:false});
+
+function toggleBoost(){
+  if(go||pa)return;
+  P.boost=!P.boost;
+  bb.classList.toggle('a',P.boost);
+  if(P.boost){seqBoost=1;seqJump=0;}
+  else{seqBoost=0;seqJump=0;}
+}
+bb.addEventListener('touchstart',e=>{e.preventDefault();toggleBoost()},{passive:false});
 
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key===' ')e.preventDefault()});
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0});
 addEventListener('contextmenu',e=>e.preventDefault());
-addEventListener('mousedown',e=>{if(e.button===2&&!go&&!pa){P.boost=!P.boost;bb.classList.toggle('a',P.boost)}});
+addEventListener('mousedown',e=>{if(e.button===2&&!go&&!pa)toggleBoost()});
 
 const mc=document.getElementById('mm').getContext('2d'),WD=COLS*CL,SC=50/WD,HF=WD/2;
 function dm(){mc.clearRect(0,0,50,50);
@@ -183,6 +227,7 @@ mc.fillStyle='#4f4';mc.fillRect((P.x+HF)*SC-2,(P.z+HF)*SC-2,4,4)}
 
 function init(){if(ms)ms.forEach(m=>S.remove(m.m));if(bs)bs.forEach(b=>S.remove(b.m));if(cs)cs.forEach(c=>S.remove(c.m));
 ms=[];bs=[];cs=[];tt=0;st=0;sht=0;go=0;pa=0;fl=0;spent=0;bonus=0;crt=0;
+seqBoost=0;seqJump=0;
 hud.classList.remove('p');po.style.display='none';rm.style.display='none';bd.classList.remove('f');
 Object.assign(P,{x:4,z:4,y:0,vy:0,og:1,yaw:0,pitch:0,boost:0});bb.classList.remove('a');
 rJ();lkT=null;document.getElementById('time').textContent='0';document.getElementById('go').style.display='none';
@@ -193,7 +238,7 @@ document.getElementById('rs').onclick=init;
 
 function sM(){let x,z,t=0;do{x=(Math.floor(Math.random()*COLS)-COLS/2+.5)*CL;
 z=(Math.floor(Math.random()*ROWS)-ROWS/2+.5)*CL;t++}while(Math.hypot(x-P.x,z-P.z)<15&&t<50);
-const m=new THREE.Mesh(mg,mm2.clone());m.position.set(x,.6,z);S.add(m);
+const m=new THREE.Mesh(mg,monsterMat.clone());m.position.set(x,1.25,z);S.add(m);
 ms.push({m,speed:2.5+Math.random()*1.2})}
 
 function sC(){
@@ -205,12 +250,10 @@ function sC(){
   const Rr=0.7,H=0.14;
   const grp=new THREE.Group();
 
-  // الجانب (بنفسجي)
   const side=new THREE.Mesh(new THREE.CylinderGeometry(Rr,Rr,H,24,1,true),cSide);
   side.rotation.z=Math.PI/2;
   grp.add(side);
 
-  // الوجهان - كل واحد بصورة مستقلة عشان ما يصير انعكاس
   const fGeo=new THREE.CircleGeometry(Rr,24);
   const f1=new THREE.Mesh(fGeo,cFace);
   f1.position.x=H/2; f1.rotation.y=Math.PI/2;
@@ -237,22 +280,21 @@ if(Math.hypot(ix,iz)>.15){const sY=Math.sin(P.yaw),cY=Math.cos(P.yaw);
 const dx=-sY*-iz+cY*ix,dz=-cY*-iz-sY*ix,sp=P.boost?P.speed*2:P.speed;
 const nx=P.x+dx*sp*dt,nz=P.z+dz*sp*dt;
 if(fl||!col(nx,P.z,PR))P.x=nx;if(fl||!col(P.x,nz,PR))P.z=nz}
-if(keys[' ']&&P.og&&!fl){P.vy=JV;P.og=0}
+if(keys[' ']&&P.og&&!fl){P.vy=JV;P.og=0;if(P.boost)seqJump=1;}
 if(fl){P.y+=(FH-P.y)*Math.min(dt*3,1);P.vy=0;P.og=0}
 else if(!P.og){P.vy-=GR*dt;P.y+=P.vy*dt;if(P.y<=0){P.y=0;P.vy=0;P.og=1}}
 C.position.set(P.x,P.y+1.6,P.z);C.rotation.order='YXZ';C.rotation.y=P.yaw;C.rotation.x=P.pitch;
 const sm=Math.min(1+tt*.08,6),safe=P.y>SH;let nr=null,nd=Infinity;
 for(let i=ms.length-1;i>=0;i--){const m=ms[i],dx=P.x-m.m.position.x,dz=P.z-m.m.position.z,d=Math.hypot(dx,dz)||1;
 const sp=m.speed*sm,nx=m.m.position.x+(dx/d)*sp*dt,nz=m.m.position.z+(dz/d)*sp*dt;
-if(!col(nx,m.m.position.z,.6))m.m.position.x=nx;if(!col(m.m.position.x,nz,.6))m.m.position.z=nz;
+if(!col(nx,m.m.position.z,1.25))m.m.position.x=nx;if(!col(m.m.position.x,nz,1.25))m.m.position.z=nz;
 m.m.rotation.y=Math.atan2(dx,dz);if(d<nd){nd=d;nr=m}
-if(d<1.1&&!safe){endG();return}}
+if(d<1.8&&!safe){endG();return}}
 sht-=dt;if(sht<=0&&nr&&nd<25){shoot();sht=.2}
 for(let i=bs.length-1;i>=0;i--){const b=bs[i];b.m.position.x+=b.vx*dt;b.m.position.z+=b.vz*dt;b.life-=dt;
 let rm=0;for(let j=ms.length-1;j>=0;j--){const m=ms[j];
-if(Math.hypot(b.m.position.x-m.m.position.x,b.m.position.z-m.m.position.z)<1){S.remove(m.m);ms.splice(j,1);S.remove(b.m);bs.splice(i,1);rm=1;break}}
+if(Math.hypot(b.m.position.x-m.m.position.x,b.m.position.z-m.m.position.z)<1.6){S.remove(m.m);ms.splice(j,1);S.remove(b.m);bs.splice(i,1);rm=1;break}}
 if(!rm&&b.life<=0){S.remove(b.m);bs.splice(i,1)}}
-// العملات
 for(let i=cs.length-1;i>=0;i--){const c=cs[i];c.m.rotation.y+=dt*3;
 c.m.position.y=.9+Math.sin(tt*3)*.15;
 if(Math.hypot(c.m.position.x-P.x,c.m.position.z-P.z)<1.2){
